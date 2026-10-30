@@ -10,17 +10,20 @@
 # - Once applied during first run setup, the password is removed from this file, encrypted and stored to a safer location to be used by dietpi-software only.
 # - WARN: The default SSH server Dropbear does not support passwords over 100 bytes. Certain special characters, and such with accents, take 2 bytes.
 # - WARN: We cannot guarantee that all software options can handle special characters like $"|\.
+
+# Pulled from https://raw.githubusercontent.com/MichaIng/DietPi/refs/heads/dev/dietpi.txt
+# Options altered from the original are signified by ## following the new value
 AUTO_SETUP_GLOBAL_PASSWORD=dietpi
 
 ##### Language/Regional options #####
 # Locale e.g.: "en_GB.UTF-8" / "de_DE.UTF-8" | One entry and UTF-8 ONLY!
-AUTO_SETUP_LOCALE=en_US.UTF-8
+AUTO_SETUP_LOCALE=en_US.UTF-8 ##
 
 # Keyboard layout e.g.: "gb" / "us" / "de" / "fr"
-AUTO_SETUP_KEYBOARD_LAYOUT=en
+AUTO_SETUP_KEYBOARD_LAYOUT=en ##
 
 # Time zone e.g.: "Europe/London" / "America/New_York" | Full list: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
-AUTO_SETUP_TIMEZONE=UTC
+AUTO_SETUP_TIMEZONE=America/Los_Angeles
 
 ##### Network options #####
 # Enable Ethernet or WiFi adapter: 1=enable | 0=disable
@@ -31,19 +34,19 @@ AUTO_SETUP_NET_WIFI_ENABLED=0
 
 # WiFi country code: 2 capital letter value (e.g. GB US DE JP): https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2
 # - NB: This choice may be overridden if the WiFi access point sends a country code.
-AUTO_SETUP_NET_WIFI_COUNTRY_CODE=US
+AUTO_SETUP_NET_WIFI_COUNTRY_CODE=US ##
 
 # Enter your static network details below, if applicable. The netmask in CIDR notation is optional, and defaults to "/24".
-AUTO_SETUP_NET_USESTATIC=1
+AUTO_SETUP_NET_USESTATIC=1 ##
 AUTO_SETUP_NET_STATIC_IP=192.168.0.100/24
 AUTO_SETUP_NET_STATIC_GATEWAY=192.168.0.1
-AUTO_SETUP_NET_STATIC_DNS=192.168.0.1 9.9.9.11
+AUTO_SETUP_NET_STATIC_DNS=192.168.0.1 9.9.9.11 ##
 
 # Set to "1" to convert DHCP leased network settings into static settings automatically on first boot.
 AUTO_SETUP_DHCP_TO_STATIC=0
 
 # Hostname
-AUTO_SETUP_NET_HOSTNAME=3cx_sbc_<LOCATION>
+AUTO_SETUP_NET_HOSTNAME=3cx_sbc_<LOCATION> ##
 
 # Force Ethernet speeds: 0=automatic speed | 10 = 10 Mbit/s | 100 = 100 Mbit/s etc.
 # - Use this when your Ethernet adapter has an unstable 1 Gbit/s link.
@@ -60,7 +63,7 @@ AUTO_SETUP_SWAPFILE_LOCATION=/var/swap
 
 # Serial console: Set to "0" if you do not require a serial console. It will then be disabled automatically on first boot.
 # - If you leave it at "1", and first login does not happen on a serial console, a dialogue offers to disable it instead.
-CONFIG_SERIAL_CONSOLE_ENABLE=0
+CONFIG_SERIAL_CONSOLE_ENABLE=0 ##
 
 # Unmask (enable) systemd-logind service (including dbus), which is masked by default on DietPi
 AUTO_UNMASK_LOGIND=0
@@ -69,7 +72,7 @@ AUTO_UNMASK_LOGIND=0
 # - Add as many APT package names as you wish, separated by space.
 # - They will be installed after dietpi-software options and before the script defined via AUTO_SETUP_CUSTOM_SCRIPT_EXEC (see below) is executed.
 # - E.g. the following (without the leading "#") will install the APT packages iotop, iptables and xz-utils:
-AUTO_SETUP_APT_INSTALLS=unattended-upgrades
+AUTO_SETUP_APT_INSTALLS=unattended-upgrades ##
 
 # Custom pre-script
 # - Allows you to automatically execute a custom script on first boot, before network is up.
@@ -81,7 +84,7 @@ AUTO_SETUP_APT_INSTALLS=unattended-upgrades
 # - Option 0 = Copy your script to /boot/Automation_Custom_Script.sh and it will be executed automatically.
 # - Option 1 = Host your script online, then use e.g. AUTO_SETUP_CUSTOM_SCRIPT_EXEC=https://myweb.com/myscript.sh and it will be downloaded and executed automatically.
 # - Logs can be found near the end of /var/lib/dietpi/logs/dietpi-firstrun-setup.log.
-AUTO_SETUP_CUSTOM_SCRIPT_EXEC=1 # /var/lib/dietpi/logs/dietpi-firstrun-setup.log
+AUTO_SETUP_CUSTOM_SCRIPT_EXEC=1 # /var/lib/dietpi/logs/dietpi-firstrun-setup.log ##
 
 # Restore a DietPi-Backup on first boot: 0 => disable | 1 => interactive restore (show list of found backups) | 2 => non-interactive restore (restore first found backup)
 # - Simply attach the drive/disk/stick which contains the backup. All attached drives will be mounted temporarily and searched automatically.
@@ -137,14 +140,14 @@ AUTO_SETUP_AUTOSTART_LOGIN_USER=root
 # On first boot, run updates, initial setup, and optional software installs without any user interaction.
 # - Please change AUTO_SETUP_GLOBAL_PASSWORD when enabling this option!
 # - In case of a failure with AUTO_SETUP_AUTOMATED=1, a dialogue will offer to rerun everything in interactive mode.
-AUTO_SETUP_AUTOMATED=1
+AUTO_SETUP_AUTOMATED=1 ##
 
 #------------------------------------------------------------------------------------------------------
 ##### Misc DietPi program settings #####
 #------------------------------------------------------------------------------------------------------
 # DietPi-Survey: 1=opt in | 0=opt out | -1=ask on first call
 # - https://dietpi.com/docs/dietpi_tools/system_configuration/#dietpi-survey
-SURVEY_OPTED_IN=-1
+SURVEY_OPTED_IN=0
 
 #------------------------------------------------------------------------------------------------------
 ##### DietPi-Config settings #####
@@ -212,10 +215,10 @@ CONFIG_CHECK_DIETPI_UPDATES=1
 
 # Daily check for APT package updates: 0=disable | 1=check only | 2=check and upgrade automatically
 # - Upgrade logs can be found at: /var/lib/dietpi/logs/dietpi-upgrade_apt.log
-CONFIG_CHECK_APT_UPDATES=1
+CONFIG_CHECK_APT_UPDATES=1 ##
 
 # Network time sync: 0=disabled | 1=boot only | 2=boot + daily | 3=boot + hourly | 4=Daemon + Drift
-CONFIG_NTP_MODE=2
+CONFIG_NTP_MODE=4 ##
 
 # Network time sync timeout in seconds, after which a sync attempt is aborted in modes 1-3
 CONFIG_TIMESYNC_TIMEOUT=60
