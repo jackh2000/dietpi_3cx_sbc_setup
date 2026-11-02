@@ -1,6 +1,5 @@
 #!/bin/bash
 # 
-# 
 # Script to automatically setup a 3CX SBC on a Raspberry Pi with DietPi OS.
 #
 # GOALS:
@@ -14,11 +13,13 @@
 # template that change on each install. These will be pulled from a
 # corresponding json file.
 #
-# Copy the txt template and rename it to /boot/dietpi.txt
+# Copy 3cx_sbc_dietpi.txt to the RasPi as /boot/dietpi.txt
 #
 # Perform additional configuration options:
 #
-# 1. Update packages
-# 2. Harden ssh
-# 3. Configure unattended upgrades
-# 4. Configure the 3CX SBC
+# 1. Verify network connectivity
+# 2. Update packages
+# 3. Create a new sudo user
+# 4. Harden ssh
+# 5. Configure unattended upgrades
+# 6. Configure the 3CX SBC
