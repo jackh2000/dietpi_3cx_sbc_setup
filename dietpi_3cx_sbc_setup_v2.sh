@@ -27,7 +27,6 @@ readonly DIETPI_CONFIG='/boot/dietpi.txt'
 readonly POST_INSTALL_SCRIPT='/boot/Automation_Custom_Script.sh'
 readonly SETUP_SERVICE='sbc_setup.service' # systemd service to run on next boot
 readonly SERVICE_FILE="/etc/systemd/system/$SETUP_SERVICE"
-readonly REBOOT_DELAY=15
 
 # Accepts the name of a setting in the dietpi.txt config file as an argument
 read_setting() {
@@ -37,22 +36,8 @@ read_setting() {
     sed -n "s/^${setting_name}=//p" "$DIETPI_CONFIG" # val
 }
 
-# Notify the user that system will reboot automatically after <timeout> seconds.
-# Allow manual intervention to cancel. If canceled, return to shell.
-# Usage: reboot_prompt --timeout=60
-reboot_prompt() {
-    local timeout="${1#--timeout=}"
-
-    printf 'System will automatically reboot in %s seconds. Press any key to' \
-        'cancel\n' "$timeout"
-    
-    # Read from cli. Treat / literally, hide typed char, finish after 1 char,
-    # wait at most --timeout seconds
-    if read -r -s -n 1 -t "$timeout"; then
-        printf '\nReboot canceled\n'
-        return 0 # exit to shell
-    fi
-
+# Notify the user that system will reboot and cleanly reboot system
+reboot_and_notify() {
     printf '\nRebooting now\n'
     sync # flush pending filesystem writes
     systemctl reboot
@@ -73,12 +58,8 @@ After=network-online.target
 Type=oneshot
 ExecStart=/bin/bash $POST_INSTALL_SCRIPT $next_stage # what to execute on next boot
 TimeoutStartSec=0 # disable timeout
-# use tty console to allow keyboard/mouse input & output 
-StandardInput=tty
-StandardOutput=tty
-StandardError=tty
-TTYPath=/dev/tty1
-TTYReset=yes # clear tty settings after reboot to avoid undefined behavior
+StandardOutput=journal+console
+StandardError=journal+console
 
 [Install]
 WantedBy=multi-user.target
@@ -107,7 +88,8 @@ main() {
         --updates)
                 set_next_boot_service --configure
                 update_packages
-                reboot_prompt --timeout="$REBOOT_DELAY"
+                printf 'Package updates complete. Rebooting to continue setup\n'
+                reboot_and_notify
                 ;;
         --configure)
             # after updates, configure unattended-upgrades, create new user, 
