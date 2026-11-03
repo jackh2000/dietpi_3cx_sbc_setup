@@ -23,7 +23,7 @@ umask 077 # remove permissions from group and public
 
 readonly DIETPI_CONFIG='/boot/dietpi.txt'
 readonly POST_INSTALL_SCRIPT='/boot/Automation_Custom_Script.sh'
-readonly SETUP_SERVICE='sbc_setup.service' # systemd service to run on later boot
+readonly SETUP_SERVICE='sbc_setup.service' # systemd service to run on next boot
 readonly SERVICE_FILE="/etc/systemd/system/$SETUP_SERVICE"
 
 # Accepts the name of a setting in the dietpi.txt config file as an argument
@@ -72,7 +72,10 @@ update_packages() {
 }
 
 main() {
-    case "${1:-}" in # compare first arg against case. default to empty string
+    case "$1" in # compare first arg against case. default to empty string
+        --updates)
+                # package update
+                ;;
         --configure)
             # after updates, configure unattended-upgrades, create new user, 
             # harden ssh, run 3cx script
@@ -80,10 +83,9 @@ main() {
         --cleanup)
             # delete systemd setup file and service
             ;;
-        --updates)
-            # package update
-            ;;
-        # else, error
+        *)
+            echo "Invalid input"
+        ;;
     esac
 }
 
