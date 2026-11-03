@@ -38,10 +38,22 @@ read_setting() {
 
 # Notify the user that system will reboot automatically after <timeout> seconds.
 # Allow manual intervention to cancel. If canceled, return to shell.
-# Inputs:
-#   --timeout=<int>: Timeout 
+# Usage: reboot_prompt --timeout=60
 reboot_prompt() {
-    local timout="$1"
+    local timout="${1#--timeout=}"
+    local cancel_key
+
+    printf 'System will automatically reboot in %s seconds. Press any key to' \
+        'cancel\n' "$timeout"
+    
+    if read -r -s -n 1 -t "$timeout" cancel_key; then
+        printf '\nReboot canceled\n'
+        return 0 # exit to shell
+    fi
+
+    printf '\nRebooting now\n'
+    sync # flush pending filesystem writes
+    systemctl reboot
 }
 
 # Create a systemd service so the script will continue on next boot
@@ -84,17 +96,12 @@ update_packages() {
     printf 'Package updates finished\n'
 }
 
-config_unattended_upgrades() {
-
-}
-
 main() {
     case "$1" in # compare first arg against case
         --updates)
                 set_next_boot_service --configure
                 update_packages
-                sync # flush pending filesystem writes
-
+                reboot_prompt --timeout=15
                 ;;
         --configure)
             # after updates, configure unattended-upgrades, create new user, 
