@@ -86,12 +86,12 @@ update_packages() {
 main() {
     case "$1" in # compare first arg against case
         --updates)
-                set_next_boot_service --configure
+                set_next_boot_service --configure_services
                 update_packages
                 printf 'Package updates complete. Rebooting to continue setup\n'
                 reboot_and_notify
                 ;;
-        --configure)
+        --configure_services)
             # after updates, configure unattended-upgrades, create new user, 
             # harden ssh, run 3cx script
             ;;
