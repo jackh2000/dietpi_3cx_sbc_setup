@@ -14,8 +14,10 @@
 # after completion, so the user will do so manually. A cleanup function will
 # then run automatically
 # 
-# Load DietPi helper scripts
-source /boot/dietpi/func/dietpi-globals
+
+set -euo pipefail # enabled strict error checking
+
+source /boot/dietpi/func/dietpi-globals # Load DietPi helper scripts
 G_PROGRAM_NAME=SBC-Setup
 G_INTERACTIVE=0 # automated script
 G_INIT # initialize dietpi workspace
@@ -28,15 +30,23 @@ readonly SERVICE_FILE="/etc/systemd/system/$SETUP_SERVICE"
 
 # Accepts the name of a setting in the dietpi.txt config file as an argument
 read_setting() {
-    local setting_name="$1"
+    local setting_name="$1" # key
 
     # read the value of the matching setting from the config file
-    sed -n "s/^${setting_name}=//p" "$DIETPI_CONFIG"
+    sed -n "s/^${setting_name}=//p" "$DIETPI_CONFIG" # val
+}
+
+# Notify the user that system will reboot automatically after <timeout> seconds.
+# Allow manual intervention to cancel. If canceled, return to shell.
+# Inputs:
+#   --timeout=<int>: Timeout 
+reboot_prompt() {
+    local timout="$1"
 }
 
 # Create a systemd service so the script will continue on next boot
 # Accepts the name of the next stage as an argument
-configure_next_boot_stage() {
+set_next_boot_service() {
     local next_stage="$1"
 
     cat > "$SERVICE_FILE" <<EOF
@@ -47,6 +57,7 @@ After=network-online.target
 
 [Service]
 Type=oneshot
+ExecStart=/bin/bash $POST_INSTALL_SCRIPT $next_stage # what to execute on next boot
 TimeoutStartSec=0 # disable timeout
 StandardOutput=journal+console
 StandardError=journal+console
@@ -69,12 +80,21 @@ update_packages() {
     apt full-upgrade -y
     G_AGA
     apt autoclean -y
+
+    printf 'Package updates finished\n'
+}
+
+config_unattended_upgrades() {
+
 }
 
 main() {
-    case "$1" in # compare first arg against case. default to empty string
+    case "$1" in # compare first arg against case
         --updates)
-                # package update
+                set_next_boot_service --configure
+                update_packages
+                sync # flush pending filesystem writes
+
                 ;;
         --configure)
             # after updates, configure unattended-upgrades, create new user, 
