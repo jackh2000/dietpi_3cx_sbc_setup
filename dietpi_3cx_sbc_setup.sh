@@ -162,6 +162,7 @@ main() {
             set_next_boot_service --cleanup
             configure_unattended_upgrades "$username"
             add_sudoer "$username"
+			configure_ssh "$username"
             ;;
         --cleanup)
             # delete systemd setup file and service
