@@ -83,17 +83,41 @@ update_packages() {
     printf 'Package updates finished\n'
 }
 
+configure_unattended_upgrades() {
+    cat > /etc/apt/apt.conf.d/20auto-upgrades <<'EOF'
+// apt install unattended-upgrades should make this file by default
+// comments added for clarity
+APT::Periodic::Update-Package-Lists "1"; // equivalent to daily apt update
+APT::Periodic::Unattended-Upgrade "1"; // equivalent to daily apt upgrade
+EOF
+
+    cat > /etc/apt/apt.conf.d/52unattended-upgrades-local <<'EOF'
+// Modifies Unattended-Upgrades default config
+// Requires unattended-upgrades package to be installed
+
+Unattended-Upgrade::Automatic-Reboot "true";
+Unattended-Upgrade::Automatic-Reboot-Time "03:00";// reboot at 3am machine time
+// two lines below are equivalent to sudo apt autoremove -y
+Unattended-Upgrade::Remove-Unused-Dependencies "true";
+Unattended-Upgrade::Remove-New-Unused-Dependencies "true";
+EOF
+
+    systemctl enable --now apt-daily.timer apt-daily-upgrade.timer
+}
+
 main() {
     case "$1" in # compare first arg against case
         --updates)
-                set_next_boot_service --configure_services
-                update_packages
-                printf 'Package updates complete. Rebooting to continue setup\n'
-                reboot_and_notify
-                ;;
+            set_next_boot_service --configure_services
+            update_packages
+            printf 'Package updates complete. Rebooting to continue setup\n'
+            reboot_and_notify
+            ;;
         --configure_services)
             # after updates, configure unattended-upgrades, create new user, 
             # harden ssh, run 3cx script
+            set_next_boot_service --cleanup
+            configure_unattended_upgrades
             ;;
         --cleanup)
             # delete systemd setup file and service
