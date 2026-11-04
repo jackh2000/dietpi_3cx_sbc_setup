@@ -14,7 +14,7 @@
 # after completion, so the user will do so manually. A cleanup function will
 # then run automatically
 # 
-
+set +xv # disable command tracing since the script will contain passwords
 set -euo pipefail # enabled strict error checking
 
 source /boot/dietpi/func/dietpi-globals # Load DietPi helper scripts
@@ -58,8 +58,11 @@ After=network-online.target
 Type=oneshot
 ExecStart=/bin/bash $POST_INSTALL_SCRIPT $next_stage # what to execute on next boot
 TimeoutStartSec=0 # disable timeout
-StandardOutput=journal+console
-StandardError=journal+console
+StandardInput=tty
+StandardOutput=tty
+StandardError=tty
+TTYPath=/dev/tty1
+TTYReset=yes
 
 [Install]
 WantedBy=multi-user.target
@@ -105,6 +108,23 @@ EOF
     systemctl enable --now apt-daily.timer apt-daily-upgrade.timer
 }
 
+add_sudoer() {
+	set +xv # ensure tracing is disabled even if function is called elsewhere
+    local un 
+	local +x pw # keep password local
+
+    un=$(read_setting SUDOER_UN)
+    pw=$(read_setting SUDOER_PW)
+
+	useradd --create-home --user-group --shell /bin/bash "$un"
+	# chpasswd normally reads from stdin, so redirect with builtinprintf
+	builtin printf '%s:%s\n' "$un" "$pw" | chpasswd
+    unset pw
+	# remove password from config file
+	sed -i '/^SUDOER_PW=/d' "$DIETPI_CONFIG"
+	usermod -aG sudo "$un" # add to sudo group
+}
+
 main() {
     case "$1" in # compare first arg against case
         --updates)
@@ -118,6 +138,7 @@ main() {
             # harden ssh, run 3cx script
             set_next_boot_service --cleanup
             configure_unattended_upgrades
+            add_sudoer
             ;;
         --cleanup)
             # delete systemd setup file and service
