@@ -110,19 +110,40 @@ EOF
 
 add_sudoer() {
 	set +xv # ensure tracing is disabled even if function is called elsewhere
-    local un 
-	local +x pw # keep password local
+    local sudo_un="$1"
+	local +x sudo_pw # keep password local
 
-    un=$(read_setting SUDOER_UN)
-    pw=$(read_setting SUDOER_PW)
+    sudo_un=$(read_setting SUDOER_UN)
+    sudo_pw=$(read_setting SUDOER_PW)
 
-	useradd --create-home --user-group --shell /bin/bash "$un"
-	# chpasswd normally reads from stdin, so redirect with builtinprintf
-	builtin printf '%s:%s\n' "$un" "$pw" | chpasswd
-    unset pw
-	# remove password from config file
-	sed -i '/^SUDOER_PW=/d' "$DIETPI_CONFIG"
-	usermod -aG sudo "$un" # add to sudo group
+	useradd --create-home --user-group --shell /bin/bash "$sudo_un"
+	# chpasswd normally reads from stdin, so redirect with builtin printf
+	builtin printf '%s:%s\n' "$sudo_un" "$sudo_pw" | chpasswd
+    unset sudo_pw
+	sed -i '/^SUDOER_PW=/d' "$DIETPI_CONFIG" # remove password from config file
+	usermod -aG sudo "$sudo_un" # add to sudo group
+}
+
+configure_ssh() {
+	local sudo_un="$1"
+	local dropbear_config='/etc/default/dropbear'
+
+	# disable root login and port forwarding. allow login only from earlier
+	# created user group. set max auth tries to 3 and idle timeout to 30 min
+	local dropbear_args="-w -G $sudo_un -j -k -T 3 -I 1800"
+
+	if grep -q \ # check there is a line with DROPBEAR_EXTRA_ARGS
+		'^[[:space:]]*DROPBEAR_EXTRA_ARGS[[:space:]]*=' "$dropbear_config"
+	then # if so, add the dropbear args to the line after DROPBEAR_EXTRA_ARGS
+		sed -i \
+			"s/^[[:space:]]*DROPBEAR_EXTRA_ARGS[[:space:]]*=.*/DROPBEAR_EXTRA_ARGS=\"$dropbear_args\"/" \
+            "$dropbear_config"
+	else
+		printf '\nDROPBEAR_EXTRA_ARGS="%s"\n' "$dropbear_args" >> "$dropbear_config"
+	fi
+	
+	systemctl enable dropbear
+	systemctl restart dropbear
 }
 
 main() {
@@ -136,9 +157,11 @@ main() {
         --configure_services)
             # after updates, configure unattended-upgrades, create new user, 
             # harden ssh, run 3cx script
+			local username
+			username=$(read_setting SUDOER_UN)
             set_next_boot_service --cleanup
-            configure_unattended_upgrades
-            add_sudoer
+            configure_unattended_upgrades "$username"
+            add_sudoer "$username"
             ;;
         --cleanup)
             # delete systemd setup file and service
