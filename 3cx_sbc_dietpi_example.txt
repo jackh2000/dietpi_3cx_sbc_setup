@@ -371,7 +371,9 @@ DEV_GITOWNER=MichaIng
 #------------------------------------------------------------------------------------------------------
 
 #------------------------------------------------------------------------------------------------------##
-##### Custom added settings for setup script #####
+##### Custom added settings for 3CX setup script #####
+# - Once applied during first run setup, the sudoer password is removed from 
+#   this file, to be used by dietpi-software only.
 #------------------------------------------------------------------------------------------------------##
 SUDOER_UN=admin ##
 SUDOER_PW=dietpi ##

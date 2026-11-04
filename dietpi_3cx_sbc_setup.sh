@@ -1,61 +1,131 @@
 #!/bin/bash
-# Script to automatically setup a 3CX SBC on a Raspberry Pi
-# Installs as /usr/local/sbin/dietpi_3cx_sbc_setup and resumes at login during 
-# install process. Removes itself upon completion.
-# User should log in as root until the sudo user is created.
-# Developed for DietPi 10.8, but 10.7 should also work.
-# Uses the dietpi-config CLI helpers. See dietpi documentation.
+# 
+# Script to automatically setup a 3CX SBC on a Raspberry Pi with DietPi OS. In
+# dietpi.txt set AUTO_SETUP_CUSTOM_SCRIPT_EXEC=0 and copy this script into 
+# /boot/Automation_Custom_Script.sh to run it automatically on first boot
+# 
+# GOALS:
+# - update packages and reboot
+# - configure unattended upgrades
+# - create a new sudo user
+# - harden ssh
+# - install the 3cx script. Note 3CX doesn't offer an unattended installation,
+# so user interactioni is required for this step. It also requires a reboot
+# after completion, so the user will do so manually. A cleanup function will
+# then run automatically
+# 
 
-# --- DEFAULTS --- #
-# see dietpi-config documentation for options
-DEFAULT_KEYBOARD='us'
-DEFAULT_LOCALE='en_US.UTF-8'
-DEFAULT_TIMEZONE='America/Los_Angeles' # Pacific with automatic DST
-DEFAULT_INTERFACE='eth0' # may need to change for VMs
-DEFAULT_TIME_SYNC_MODE=4 # 1=time sync on boot, 2=sync on boot+daily, 
-# 3=on boot+hourly, 4=run as background daemon and account for drift
-# Time inaccuracies can cause errors internet connections, esp apt
-DEFAULT_3CX_INSTALLER_URL='https://downloads-global.3cx.com/downloads/sbc/3cxsbc.zip'
-REBOOT_DELAY=15 # Seconds. Enter reboots immediately.
-AUTO_RESUME_ON_LOGIN=1
+set -euo pipefail # enabled strict error checking
 
-# --- Modify terminal settings --- #
-set +x # Disable command tracing since some lines will contain passwords
-set -E # Enable errtrace: failure of a command within a command substitution or 
-# subshell will be inherited as a failure of the overall command
-set -e # Enable errexit: exit immediately on an unhandled command failure, even
-# if it is within command subsitution or subshell
-set -o pipefail # Enable pipefail: return value of a pipeline fails if any
-# command in the pipeline fails, rather than returning the value of the
-# rightmost command in the pipeline
+source /boot/dietpi/func/dietpi-globals # Load DietPi helper scripts
+G_PROGRAM_NAME=SBC-Setup
+G_INTERACTIVE=0 # automated script
+G_INIT # initialize dietpi workspace
+umask 077 # remove permissions from group and public
 
-umask 077 # set permissions
+readonly DIETPI_CONFIG='/boot/dietpi.txt'
+readonly POST_INSTALL_SCRIPT='/boot/Automation_Custom_Script.sh'
+readonly SETUP_SERVICE='sbc_setup.service' # systemd service to run on next boot
+readonly SERVICE_FILE="/etc/systemd/system/$SETUP_SERVICE"
 
-# --- ENVIRONMENT VARS --- #
-export PATH='/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin' #set
-# PATH explicitly to account for varying install environments
-unset BASH_ENV ENV APT_CONFIG # unset environment var's from previous scripts
-export SBC_SETUP_RUNNING=1 # save state of script to avoid pauses on reboots,
-# available to new bash processes or programs
+# Accepts the name of a setting in the dietpi.txt config file as an argument
+read_setting() {
+    local setting_name="$1" # key
 
-# --- DIRECTORY PATHS --- #
-DPiScripts='/boot/dietpi' # location of built in dietpi scripts
-RUNNER='/usr/local/sbin/dietpi_3cx_sbc_setup' # path to this script
-DATA='/var/lib/dietpi_3cx_sbc_setup' # store progress, backups, etc
-STATE="$DATA/state" # record progress of script
-LOGIN_HOOK='/etc/profile.d/90dietpi-3cx-sbc-setup.sh' # hook to launch this 
-# script on login
+    # read the value of the matching setting from the config file
+    sed -n "s/^${setting_name}=//p" "$DIETPI_CONFIG" # val
+}
 
-# --- PROGRESS TRACKING --- #
-STAGE='basics' # stage can be basics, network, network-verify, updates, 
-# passwords, account, autoupdates, 3cx-sbc, sbc-verify, sys-verify, done
-BOOT_UUID_SCRIPT='' # boot UUID when script requests a reboot. Can compare to
-# later UUID to verify the reboot occurred
-BOOT_UUID_3CX=''; # boot UUID when 3CX installer runs
+# Notify the user that system will reboot and cleanly reboot system
+reboot_and_notify() {
+    printf '\nRebooting now\n'
+    sync # flush pending filesystem writes
+    systemctl reboot
+}
 
-# --- NETWORK VARIABLES --- #
-# note RPI_IP must be in CIDR notation, ie 192.168.1.250/24
-INTERFACE=''; RPI_IP=''; GATEWAY=''; DNS=''; HOSTNAME=''; 
+# Create a systemd service so the script will continue on next boot
+# Accepts the name of the next stage as an argument
+set_next_boot_service() {
+    local next_stage="$1"
 
-# --- NEW USER --- #
-ADMIN_UN=''; ADMIN_UID=''
+    cat > "$SERVICE_FILE" <<EOF
+[UNIT]
+Description=Continue DietPi initial SBC setup
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash $POST_INSTALL_SCRIPT $next_stage # what to execute on next boot
+TimeoutStartSec=0 # disable timeout
+StandardOutput=journal+console
+StandardError=journal+console
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    chmod 644 "$SERVICE_FILE" # owner has r/w, others have read
+    systemctl daemon-reload
+    # run on future boots
+    systemctl enable "$SETUP_SERVICE"
+}
+
+# Run apt update, upgrade, autoremove, autoclean. Use dietpi helper functions
+# where possible
+update_packages() {
+    G_AGUP
+    G_AGUG
+    apt full-upgrade -y
+    G_AGA
+    apt autoclean -y
+
+    printf 'Package updates finished\n'
+}
+
+configure_unattended_upgrades() {
+    cat > /etc/apt/apt.conf.d/20auto-upgrades <<'EOF'
+// apt install unattended-upgrades should make this file by default
+// comments added for clarity
+APT::Periodic::Update-Package-Lists "1"; // equivalent to daily apt update
+APT::Periodic::Unattended-Upgrade "1"; // equivalent to daily apt upgrade
+EOF
+
+    cat > /etc/apt/apt.conf.d/52unattended-upgrades-local <<'EOF'
+// Modifies Unattended-Upgrades default config
+// Requires unattended-upgrades package to be installed
+
+Unattended-Upgrade::Automatic-Reboot "true";
+Unattended-Upgrade::Automatic-Reboot-Time "03:00";// reboot at 3am machine time
+// two lines below are equivalent to sudo apt autoremove -y
+Unattended-Upgrade::Remove-Unused-Dependencies "true";
+Unattended-Upgrade::Remove-New-Unused-Dependencies "true";
+EOF
+
+    systemctl enable --now apt-daily.timer apt-daily-upgrade.timer
+}
+
+main() {
+    case "$1" in # compare first arg against case
+        --updates)
+            set_next_boot_service --configure_services
+            update_packages
+            printf 'Package updates complete. Rebooting to continue setup\n'
+            reboot_and_notify
+            ;;
+        --configure_services)
+            # after updates, configure unattended-upgrades, create new user, 
+            # harden ssh, run 3cx script
+            set_next_boot_service --cleanup
+            configure_unattended_upgrades
+            ;;
+        --cleanup)
+            # delete systemd setup file and service
+            ;;
+        *)
+            echo "Invalid input"
+        ;;
+    esac
+}
+
+main "$@"
